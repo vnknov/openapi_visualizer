@@ -36,6 +36,8 @@ import html
 import json
 import sys
 import argparse
+import hashlib
+import base64
 from pathlib import Path
 from collections import defaultdict
 
@@ -393,186 +395,8 @@ def build_html(objects: dict, enums: dict, endpoints: list[dict],
     )
     n_endpoints = len(endpoints)
 
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<!-- FIX: Content Security Policy — no external resources; inline scripts/styles only -->
-<meta http-equiv="Content-Security-Policy"
-      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:;">
-<title>{safe_title} – Data Model</title>
-<style>
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:system-ui,-apple-system,sans-serif;background:#f0efe9;color:#1a1a18;
-      line-height:1.5;height:100vh;display:flex;flex-direction:column;overflow:hidden}}
-header{{flex-shrink:0;display:flex;align-items:center;gap:12px;padding:10px 20px;
-        background:#fff;border-bottom:1px solid #ddd}}
-h1{{font-size:14px;font-weight:600}}
-h1 span{{font-weight:400;color:#999;margin-left:8px;font-size:12px}}
-.tab-bar{{flex-shrink:0;display:flex;border-bottom:1px solid #ddd;background:#fff;padding:0 20px}}
-.tb{{font-size:13px;padding:8px 16px;cursor:pointer;color:#777;
-     border-bottom:2.5px solid transparent;user-select:none;transition:all .15s}}
-.tb.act{{color:#111;border-bottom-color:#111;font-weight:500}}
-.tc{{display:none;flex:1;overflow:hidden}}
-.tc.act{{display:flex;flex-direction:column}}
-
-/* ── Graph tab ── */
-.toolbar{{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:8px 16px;
-          background:#faf9f6;border-bottom:1px solid #e8e7e0;font-size:12px;flex-wrap:wrap}}
-.legend{{display:flex;flex-wrap:wrap;gap:8px;margin-right:auto}}
-.ld{{display:flex;align-items:center;gap:4px;font-size:11px;color:#666}}
-.lc{{width:9px;height:9px;border-radius:2px;flex-shrink:0}}
-.zoom-btn{{padding:3px 10px;border:1px solid #d0cfc8;border-radius:5px;background:#fff;
-           cursor:pointer;font-size:12px;line-height:1.4;color:#444}}
-.zoom-btn:hover{{background:#f5f4f0}}
-#svg-wrap{{flex:1;overflow:hidden;cursor:grab;position:relative;background:#faf9f6}}
-#svg-wrap.dragging{{cursor:grabbing}}
-#main-svg{{display:block;width:100%;height:100%}}
-.node-g{{cursor:pointer}}
-.node-g:hover .node-rect{{filter:brightness(0.93)}}
-
-/* ── Detail panel ── */
-#dp{{position:absolute;right:14px;top:10px;width:282px;background:#fff;
-     border:1px solid #d0cfc8;border-radius:12px;padding:14px 16px;display:none;
-     z-index:50;max-height:calc(100% - 30px);overflow-y:auto;
-     box-shadow:0 4px 20px rgba(0,0,0,.12)}}
-.dp-hdr{{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}}
-.dp-close{{background:none;border:none;cursor:pointer;color:#aaa;font-size:20px;line-height:1;padding:0}}
-.dp-section{{font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;
-             letter-spacing:.06em;margin:10px 0 4px;padding-top:8px;
-             border-top:1px solid #f0efe8}}
-.fr{{display:flex;align-items:center;gap:5px;padding:3px 0;border-top:1px solid #f2f1ea;font-size:12px}}
-.fn{{font-weight:600;color:#1a1a18;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}}
-.ft{{flex:1;text-align:right;color:#999;font-style:italic;white-space:nowrap;padding-left:4px;font-size:11px}}
-.rb{{width:6px;height:6px;border-radius:50%;flex-shrink:0}}
-.usage-row{{display:flex;align-items:center;gap:7px;padding:4px 0;
-            border-top:1px solid #f2f1ea;font-size:11px}}
-.method-pill{{font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;
-              color:#fff;white-space:nowrap;flex-shrink:0}}
-.usage-path{{font-family:monospace;font-size:10px;color:#555;
-             overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}}
-.usage-ctx{{font-size:9px;color:#aaa;white-space:nowrap}}
-
-/* ── API Surface tab ── */
-#ta{{overflow-y:auto;padding:16px 20px}}
-.ep-group{{margin-bottom:20px}}
-.ep-tag{{font-size:11px;font-weight:700;letter-spacing:.07em;color:#555;
-         text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;
-         border-bottom:1px solid #e0dfd8}}
-.ep-card{{background:#fff;border:1px solid #e0dfd8;border-radius:8px;margin-bottom:7px;overflow:hidden}}
-.ep-head{{display:flex;align-items:flex-start;gap:10px;padding:9px 12px;cursor:pointer}}
-.ep-head:hover{{background:#faf9f6}}
-.ep-method{{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;
-            color:#fff;white-space:nowrap;flex-shrink:0;margin-top:1px}}
-.ep-path{{font-family:monospace;font-size:12px;color:#1a1a18;font-weight:500;flex:1}}
-.ep-summary{{font-size:11px;color:#999;margin-top:2px;line-height:1.4}}
-.ep-body{{display:none;padding:4px 12px 10px;border-top:1px solid #f0efe8}}
-.ep-body.open{{display:block}}
-.schema-chip{{display:inline-flex;align-items:center;gap:5px;font-size:11px;
-              padding:3px 9px;border-radius:5px;margin:3px 4px 3px 0;
-              border:1px solid currentColor;cursor:pointer;transition:opacity .12s}}
-.schema-chip:hover{{opacity:.7}}
-.chip-role{{font-size:9px;font-weight:700;opacity:.65;text-transform:uppercase}}
-
-/* ── Schema tab ── */
-#ts{{overflow-y:auto;padding:16px 20px}}
-.sg{{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;max-width:1400px}}
-.sc{{border:1px solid #e0dfd8;border-radius:8px;overflow:hidden;background:#fff}}
-.sh{{padding:7px 10px;border-bottom:1px solid #e8e7e0;background:#faf9f6;
-     display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px}}
-.sn{{font-size:12px;font-weight:600}}
-.sf{{padding:6px 10px}}
-.sr{{display:flex;gap:5px;align-items:center;padding:2.5px 0;border-top:1px solid #f5f4f0;font-size:11px}}
-.sr:first-child{{border-top:none}}
-.fn2{{font-weight:600;color:#1a1a18}}
-.ft2{{flex:1;text-align:right;color:#888;font-style:italic;font-size:11px}}
-.card-badge{{font-size:10px;padding:1px 7px;border-radius:10px;background:#f0efe8;color:#777}}
-.root-badge{{font-size:9px;padding:1px 8px;border-radius:10px;font-weight:700;color:#fff}}
-.divider{{grid-column:1/-1;padding:14px 0 6px;font-size:12px;font-weight:600;
-          color:#666;border-top:1px solid #e0dfd8;margin-top:6px}}
-.enum-v{{font-size:11px;color:#888;line-height:1.8;word-break:break-all}}
-</style>
-</head>
-<body>
-<header>
-  <h1>{safe_title} – Data Model <span>Generated by openapi_visualizer.py</span></h1>
-</header>
-<!-- FIX: Removed inline onclick handlers; event listeners are attached in JS below -->
-<div class="tab-bar">
-  <div class="tb act" data-tab="g">Entity Graph</div>
-  <div class="tb" data-tab="a">API Surface ({n_endpoints})</div>
-  <div class="tb" data-tab="s">All Schemas</div>
-  <div class="tb" data-tab="e">All Entities</div>
-</div>
-
-<!-- GRAPH TAB -->
-<div id="tg" class="tc act">
-  <div class="toolbar">
-    <div class="legend">{legend_items}
-      <div class="ld" style="margin-left:4px;color:#ccc">|</div>
-      <div class="ld">
-        <svg width="16" height="16"><rect x="1" y="1" width="14" height="14" rx="3"
-          fill="none" stroke="#666" stroke-width="1.5" stroke-dasharray="4 2"/></svg>
-        <span>API root</span>
-      </div>
-      <div class="ld" style="color:#bbb">● required &nbsp; ○ optional</div>
-    </div>
-    <!-- FIX: Removed inline onclick; IDs used so addEventListener can attach below -->
-    <button class="zoom-btn" id="zoom-in">＋</button>
-    <button class="zoom-btn" id="zoom-out">－</button>
-    <button class="zoom-btn" id="zoom-reset">⊡ Reset</button>
-    <span id="zoom-pct" style="font-size:11px;color:#aaa;min-width:36px">100%</span>
-  </div>
-  <div id="svg-wrap">
-    <svg id="main-svg" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5"
-                markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-          <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
-                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </marker>
-      </defs>
-      <g id="canvas"></g>
-    </svg>
-  </div>
-  <div id="dp">
-    <div class="dp-hdr">
-      <span id="dp-n" style="font-size:13px;font-weight:600"></span>
-      <!-- FIX: Removed inline onclick; listener attached in JS below -->
-      <button class="dp-close" id="dp-close">×</button>
-    </div>
-    <p id="dp-d" style="font-size:11px;color:#888;margin:0 0 2px;line-height:1.5"></p>
-    <div id="dp-f"></div>
-  </div>
-</div>
-
-<!-- API SURFACE TAB -->
-<div id="ta" class="tc">
-  <div id="ep-list"></div>
-</div>
-
-<!-- SCHEMAS TAB -->
-<div id="ts" class="tc">
-  <div class="sg" id="sg"></div>
-</div>
-
-<!-- ALL ENTITIES TAB -->
-<div id="te" class="tc">
-  <div style="padding:16px 20px;border-bottom:1px solid #e0dfd8;background:#fff;position:sticky;top:0;z-index:10">
-    <!-- FIX: Removed inline oninput; listener attached in JS below -->
-    <input type="text" id="entity-filter" placeholder="Filter entities by name (e.g., 'Counter', 'Result')..."
-           style="width:100%;max-width:500px;padding:8px 12px;font-size:13px;border:1px solid #d0cfc8;
-           border-radius:6px;font-family:system-ui,sans-serif">
-    <div style="margin-top:8px;font-size:11px;color:#888">
-      <span id="entity-count"></span>
-    </div>
-  </div>
-  <div style="overflow-y:auto;padding:16px 20px" id="entity-list"></div>
-</div>
-
-<script>
-const COLORS    = {jstr(COLOR_HEX)};
+    # Build the script content first so we can compute its hash for CSP
+    script_content = f"""const COLORS    = {jstr(COLOR_HEX)};
 const MCOL      = {jstr(METHOD_COLOR)};
 const NODES     = {jstr(nodes_js)};
 const ENUMS     = {jstr(enums_js)};
@@ -1433,10 +1257,212 @@ document.getElementById('entity-filter').addEventListener('input', function() {{
 
 // Initialize entities tab
 renderEntities();
+"""
 
-</script>
+    # Build complete HTML first with placeholder hash to get final script content
+    html_template = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Security: Content Security Policy with hash-based script protection -->
+<!-- Prevents XSS even if DOM-based injection occurs; blocks all external resources -->
+<!-- Script hash is computed at generation time; only exact trusted script will execute -->
+<!-- Note: frame-ancestors is ignored in meta tags; use HTTP header for production -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-__SCRIPT_HASH_PLACEHOLDER__'; img-src data:; base-uri 'none';">
+<title>{safe_title} – Data Model</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:system-ui,-apple-system,sans-serif;background:#f0efe9;color:#1a1a18;
+      line-height:1.5;height:100vh;display:flex;flex-direction:column;overflow:hidden}}
+header{{flex-shrink:0;display:flex;align-items:center;gap:12px;padding:10px 20px;
+        background:#fff;border-bottom:1px solid #ddd}}
+h1{{font-size:14px;font-weight:600}}
+h1 span{{font-weight:400;color:#999;margin-left:8px;font-size:12px}}
+.tab-bar{{flex-shrink:0;display:flex;border-bottom:1px solid #ddd;background:#fff;padding:0 20px}}
+.tb{{font-size:13px;padding:8px 16px;cursor:pointer;color:#777;
+     border-bottom:2.5px solid transparent;user-select:none;transition:all .15s}}
+.tb.act{{color:#111;border-bottom-color:#111;font-weight:500}}
+.tc{{display:none;flex:1;overflow:hidden}}
+.tc.act{{display:flex;flex-direction:column}}
+
+/* ── Graph tab ── */
+.toolbar{{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:8px 16px;
+          background:#faf9f6;border-bottom:1px solid #e8e7e0;font-size:12px;flex-wrap:wrap}}
+.legend{{display:flex;flex-wrap:wrap;gap:8px;margin-right:auto}}
+.ld{{display:flex;align-items:center;gap:4px;font-size:11px;color:#666}}
+.lc{{width:9px;height:9px;border-radius:2px;flex-shrink:0}}
+.zoom-btn{{padding:3px 10px;border:1px solid #d0cfc8;border-radius:5px;background:#fff;
+           cursor:pointer;font-size:12px;line-height:1.4;color:#444}}
+.zoom-btn:hover{{background:#f5f4f0}}
+#svg-wrap{{flex:1;overflow:hidden;cursor:grab;position:relative;background:#faf9f6}}
+#svg-wrap.dragging{{cursor:grabbing}}
+#main-svg{{display:block;width:100%;height:100%}}
+.node-g{{cursor:pointer}}
+.node-g:hover .node-rect{{filter:brightness(0.93)}}
+
+/* ── Detail panel ── */
+#dp{{position:absolute;right:14px;top:10px;width:282px;background:#fff;
+     border:1px solid #d0cfc8;border-radius:12px;padding:14px 16px;display:none;
+     z-index:50;max-height:calc(100% - 30px);overflow-y:auto;
+     box-shadow:0 4px 20px rgba(0,0,0,.12)}}
+.dp-hdr{{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}}
+.dp-close{{background:none;border:none;cursor:pointer;color:#aaa;font-size:20px;line-height:1;padding:0}}
+.dp-section{{font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;
+             letter-spacing:.06em;margin:10px 0 4px;padding-top:8px;
+             border-top:1px solid #f0efe8}}
+.fr{{display:flex;align-items:center;gap:5px;padding:3px 0;border-top:1px solid #f2f1ea;font-size:12px}}
+.fn{{font-weight:600;color:#1a1a18;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}}
+.ft{{flex:1;text-align:right;color:#999;font-style:italic;white-space:nowrap;padding-left:4px;font-size:11px}}
+.rb{{width:6px;height:6px;border-radius:50%;flex-shrink:0}}
+.usage-row{{display:flex;align-items:center;gap:7px;padding:4px 0;
+            border-top:1px solid #f2f1ea;font-size:11px}}
+.method-pill{{font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;
+              color:#fff;white-space:nowrap;flex-shrink:0}}
+.usage-path{{font-family:monospace;font-size:10px;color:#555;
+             overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}}
+.usage-ctx{{font-size:9px;color:#aaa;white-space:nowrap}}
+
+/* ── API Surface tab ── */
+#ta{{overflow-y:auto;padding:16px 20px}}
+.ep-group{{margin-bottom:20px}}
+.ep-tag{{font-size:11px;font-weight:700;letter-spacing:.07em;color:#555;
+         text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;
+         border-bottom:1px solid #e0dfd8}}
+.ep-card{{background:#fff;border:1px solid #e0dfd8;border-radius:8px;margin-bottom:7px;overflow:hidden}}
+.ep-head{{display:flex;align-items:flex-start;gap:10px;padding:9px 12px;cursor:pointer}}
+.ep-head:hover{{background:#faf9f6}}
+.ep-method{{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;
+            color:#fff;white-space:nowrap;flex-shrink:0;margin-top:1px}}
+.ep-path{{font-family:monospace;font-size:12px;color:#1a1a18;font-weight:500;flex:1}}
+.ep-summary{{font-size:11px;color:#999;margin-top:2px;line-height:1.4}}
+.ep-body{{display:none;padding:4px 12px 10px;border-top:1px solid #f0efe8}}
+.ep-body.open{{display:block}}
+.schema-chip{{display:inline-flex;align-items:center;gap:5px;font-size:11px;
+              padding:3px 9px;border-radius:5px;margin:3px 4px 3px 0;
+              border:1px solid currentColor;cursor:pointer;transition:opacity .12s}}
+.schema-chip:hover{{opacity:.7}}
+.chip-role{{font-size:9px;font-weight:700;opacity:.65;text-transform:uppercase}}
+
+/* ── Schema tab ── */
+#ts{{overflow-y:auto;padding:16px 20px}}
+.sg{{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;max-width:1400px}}
+.sc{{border:1px solid #e0dfd8;border-radius:8px;overflow:hidden;background:#fff}}
+.sh{{padding:7px 10px;border-bottom:1px solid #e8e7e0;background:#faf9f6;
+     display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px}}
+.sn{{font-size:12px;font-weight:600}}
+.sf{{padding:6px 10px}}
+.sr{{display:flex;gap:5px;align-items:center;padding:2.5px 0;border-top:1px solid #f5f4f0;font-size:11px}}
+.sr:first-child{{border-top:none}}
+.fn2{{font-weight:600;color:#1a1a18}}
+.ft2{{flex:1;text-align:right;color:#888;font-style:italic;font-size:11px}}
+.card-badge{{font-size:10px;padding:1px 7px;border-radius:10px;background:#f0efe8;color:#777}}
+.root-badge{{font-size:9px;padding:1px 8px;border-radius:10px;font-weight:700;color:#fff}}
+.divider{{grid-column:1/-1;padding:14px 0 6px;font-size:12px;font-weight:600;
+          color:#666;border-top:1px solid #e0dfd8;margin-top:6px}}
+.enum-v{{font-size:11px;color:#888;line-height:1.8;word-break:break-all}}
+</style>
+</head>
+<body>
+<header>
+  <h1>{safe_title} – Data Model <span>Generated by openapi_visualizer.py</span></h1>
+</header>
+<!-- FIX: Removed inline onclick handlers; event listeners are attached in JS below -->
+<div class="tab-bar">
+  <div class="tb act" data-tab="g">Entity Graph</div>
+  <div class="tb" data-tab="a">API Surface ({n_endpoints})</div>
+  <div class="tb" data-tab="s">All Schemas</div>
+  <div class="tb" data-tab="e">All Entities</div>
+</div>
+
+<!-- GRAPH TAB -->
+<div id="tg" class="tc act">
+  <div class="toolbar">
+    <div class="legend">{legend_items}
+      <div class="ld" style="margin-left:4px;color:#ccc">|</div>
+      <div class="ld">
+        <svg width="16" height="16"><rect x="1" y="1" width="14" height="14" rx="3"
+          fill="none" stroke="#666" stroke-width="1.5" stroke-dasharray="4 2"/></svg>
+        <span>API root</span>
+      </div>
+      <div class="ld" style="color:#bbb">● required &nbsp; ○ optional</div>
+    </div>
+    <!-- FIX: Removed inline onclick; IDs used so addEventListener can attach below -->
+    <button class="zoom-btn" id="zoom-in">＋</button>
+    <button class="zoom-btn" id="zoom-out">－</button>
+    <button class="zoom-btn" id="zoom-reset">⊡ Reset</button>
+    <span id="zoom-pct" style="font-size:11px;color:#aaa;min-width:36px">100%</span>
+  </div>
+  <div id="svg-wrap">
+    <svg id="main-svg" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5"
+                markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
+                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+      <g id="canvas"></g>
+    </svg>
+  </div>
+  <div id="dp">
+    <div class="dp-hdr">
+      <span id="dp-n" style="font-size:13px;font-weight:600"></span>
+      <!-- FIX: Removed inline onclick; listener attached in JS below -->
+      <button class="dp-close" id="dp-close">×</button>
+    </div>
+    <p id="dp-d" style="font-size:11px;color:#888;margin:0 0 2px;line-height:1.5"></p>
+    <div id="dp-f"></div>
+  </div>
+</div>
+
+<!-- API SURFACE TAB -->
+<div id="ta" class="tc">
+  <div id="ep-list"></div>
+</div>
+
+<!-- SCHEMAS TAB -->
+<div id="ts" class="tc">
+  <div class="sg" id="sg"></div>
+</div>
+
+<!-- ALL ENTITIES TAB -->
+<div id="te" class="tc">
+  <div style="padding:16px 20px;border-bottom:1px solid #e0dfd8;background:#fff;position:sticky;top:0;z-index:10">
+    <!-- FIX: Removed inline oninput; listener attached in JS below -->
+    <input type="text" id="entity-filter" placeholder="Filter entities by name (e.g., 'Counter', 'Result')..."
+           style="width:100%;max-width:500px;padding:8px 12px;font-size:13px;border:1px solid #d0cfc8;
+           border-radius:6px;font-family:system-ui,sans-serif">
+    <div style="margin-top:8px;font-size:11px;color:#888">
+      <span id="entity-count"></span>
+    </div>
+  </div>
+  <div style="overflow-y:auto;padding:16px 20px" id="entity-list"></div>
+</div>
+
+<!-- Security Note: API schema is embedded in page source by design for visualization.
+     Ensure this HTML file is only served to authorized users or kept internal. -->
+<script>
+{script_content}</script>
 </body>
 </html>"""
+
+    # The browser hashes the exact content between <script> and </script>, including the newline
+    # after the opening tag. We need to match that exactly.
+    # The rendered HTML will have: <script>\n{script_content}</script>
+    # So we hash: \n + script_content
+    rendered_script = "\n" + script_content
+
+    # Compute SHA-256 hash of the final script as the browser will see it
+    script_hash = base64.b64encode(
+        hashlib.sha256(rendered_script.encode('utf-8')).digest()
+    ).decode('ascii')
+
+    # Substitute the hash into the HTML template
+    final_html = html_template.replace('__SCRIPT_HASH_PLACEHOLDER__', script_hash)
+
+    return final_html
 
 
 # ---------------------------------------------------------------------------

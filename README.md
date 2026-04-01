@@ -2,7 +2,7 @@
 
 **An interactive HTML visualization tool for OpenAPI 3.x specifications**
 
-Transform your OpenAPI JSON schemas into beautiful, interactive visualizations with four comprehensive views:
+Transform your OpenAPI JSON or YAML schemas into beautiful, interactive visualizations with four comprehensive views:
 
 ## Features
 
@@ -41,23 +41,30 @@ open
 ## Usage
 
 ```bash
-python openapi_visualizer.py <openapi.json> [-o output.html]
+python openapi_visualizer.py <openapi.json|openapi.yaml> [-o output.html]
 ```
 
 ### Examples
 
 ```bash
-# Generate visualization with default output name
+# Generate visualization from JSON (default output name)
 python openapi_visualizer.py api-spec.json
+
+# Generate visualization from YAML
+python openapi_visualizer.py api-spec.yaml
 
 # Specify custom output file
 python openapi_visualizer.py api-spec.json -o my-api-docs.html
+
+# Works with YAML files too
+python openapi_visualizer.py api-spec.yml -o my-api-docs.html
 ```
 
 ## Requirements
 
 - Python 3.7+
-- No external dependencies required!
+- **For JSON files**: No external dependencies required!
+- **For YAML files**: PyYAML (`pip install pyyaml`)
 
 ## Output
 
@@ -106,7 +113,7 @@ SOFTWARE.
 
 ## Tech Stack
 
-Pure Python 3 with zero external dependencies. Output uses vanilla JavaScript with embedded SVG graphics.
+Pure Python 3 with minimal dependencies (PyYAML optional, only for YAML input). Output uses vanilla JavaScript with embedded SVG graphics and hash-based Content Security Policy for XSS protection.
 
 ## Contributing
 

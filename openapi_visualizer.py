@@ -41,6 +41,12 @@ import base64
 from pathlib import Path
 from collections import defaultdict
 
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
+
 
 # ---------------------------------------------------------------------------
 # Color rules
@@ -1471,9 +1477,9 @@ h1 span{{font-weight:400;color:#999;margin-left:8px;font-size:12px}}
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate an interactive HTML data-model visualization from an OpenAPI JSON spec."
+        description="Generate an interactive HTML data-model visualization from an OpenAPI JSON or YAML spec."
     )
-    parser.add_argument("input", help="Path to OpenAPI JSON file")
+    parser.add_argument("input", help="Path to OpenAPI JSON or YAML file")
     parser.add_argument("-o", "--output", help="Output HTML file (default: <input>_model.html)")
     args = parser.parse_args()
 
@@ -1482,8 +1488,32 @@ def main():
         print(f"Error: file not found: {input_path}", file=sys.stderr)
         sys.exit(1)
 
+    # Determine file type and load accordingly
+    file_ext = input_path.suffix.lower()
+
     with open(input_path, encoding="utf-8") as f:
-        spec = json.load(f)
+        if file_ext in ('.yaml', '.yml'):
+            if not YAML_AVAILABLE:
+                print(f"Error: PyYAML is required for YAML files. Install with: pip install pyyaml", file=sys.stderr)
+                sys.exit(1)
+            spec = yaml.safe_load(f)
+        elif file_ext == '.json':
+            spec = json.load(f)
+        else:
+            # Try to auto-detect by attempting JSON first, then YAML
+            content = f.read()
+            try:
+                spec = json.loads(content)
+            except json.JSONDecodeError:
+                if YAML_AVAILABLE:
+                    try:
+                        spec = yaml.safe_load(content)
+                    except yaml.YAMLError:
+                        print(f"Error: Could not parse file as JSON or YAML", file=sys.stderr)
+                        sys.exit(1)
+                else:
+                    print(f"Error: File appears to be YAML but PyYAML is not installed. Install with: pip install pyyaml", file=sys.stderr)
+                    sys.exit(1)
 
     api_title   = spec.get("info", {}).get("title", input_path.stem)
     api_version = spec.get("info", {}).get("version", "")

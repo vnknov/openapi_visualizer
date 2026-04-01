@@ -49,21 +49,27 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
-# Color rules
+# Color rules - Universal structural patterns
 # ---------------------------------------------------------------------------
-COLOR_RULES = [
-    (lambda k, s: _has_all_fields(s, {"metadata", "prShares", "mrShares"}), "purple"),
-    (lambda k, s: "error" in k.lower(),                                      "red"),
-    (lambda k, s: any(x in k for x in ("Scope", "Date", "Period", "Range", "Validity")), "amber"),
-    (lambda k, s: any(x in k for x in ("Share", "Claim", "Counter")),        "teal"),
-    (lambda k, s: any(x in k for x in ("Party", "Account", "Creator", "Publisher")), "coral"),
-    (lambda k, s: any(x in k for x in ("Work", "Title", "Reference", "Note", "Original")), "blue"),
-    (lambda k, s: True,                                                       "gray"),
-]
+# Colors are assigned based on schema characteristics rather than domain-specific names:
+# - Root entities (API surface): purple - most important, top of hierarchy
+# - Large complex entities: blue - core domain objects
+# - Error/Response wrappers: red - special handling types
+# - Enumerations/constants: amber - configuration/lookup types
+# - Small entities: teal - value objects, DTOs
+# - Medium entities: coral - supporting entities
+# - Leaf entities (no refs): green - simple data containers
+# - Default: gray - uncategorized
 
 COLOR_HEX = {
-    "purple": "#7F77DD", "blue": "#378ADD", "teal": "#1D9E75",
-    "coral":  "#D85A30", "amber": "#BA7517", "gray": "#888780", "red": "#E24B4A",
+    "purple": "#7F77DD",  # Root/API surface entities
+    "blue": "#378ADD",     # Large complex entities (8+ fields)
+    "red": "#E24B4A",      # Error/result wrappers
+    "amber": "#BA7517",    # Small enums/config (1-2 fields)
+    "teal": "#1D9E75",     # Small entities (3-5 fields)
+    "coral": "#D85A30",    # Medium entities (6-7 fields)
+    "green": "#2D9574",    # Leaf entities (no relationships)
+    "gray": "#888780",     # Default/uncategorized
 }
 
 METHOD_COLOR = {
@@ -72,17 +78,83 @@ METHOD_COLOR = {
 }
 
 
-def _has_all_fields(schema: dict, fields: set) -> bool:
-    return fields.issubset(schema.get("properties", {}).keys())
+def _count_refs(schema: dict) -> int:
+    """Count number of reference fields (relationships) in a schema."""
+    count = 0
+    for prop in schema.get("properties", {}).values():
+        if isinstance(prop, dict):
+            if "$ref" in prop or "" in prop:
+                count += 1
+            elif prop.get("type") == "array":
+                items = prop.get("items", {})
+                if isinstance(items, dict) and ("$ref" in items or "" in items):
+                    count += 1
+    return count
 
 
-def get_color(key: str, schema: dict) -> str:
-    for rule, color in COLOR_RULES:
-        try:
-            if rule(key, schema):
-                return color
-        except Exception:
-            pass
+def _is_error_or_wrapper(key: str, schema: dict) -> bool:
+    """Detect error responses or generic wrapper types."""
+    key_lower = key.lower()
+    props = schema.get("properties", {})
+    prop_names = set(props.keys())
+
+    # Common error patterns
+    if any(x in key_lower for x in ("error", "exception", "fault", "problem")):
+        return True
+
+    # Response wrapper patterns (has generic fields like data, status, message)
+    wrapper_indicators = {"data", "status", "message", "code", "error", "errors", "success"}
+    if len(prop_names & wrapper_indicators) >= 2 and len(props) <= 5:
+        return True
+
+    return False
+
+
+def get_color(key: str, schema: dict, is_root: bool = False, incoming_refs: int = 0) -> str:
+    """
+    Assign color based on universal structural characteristics.
+
+    Args:
+        key: Schema name
+        schema: Schema definition
+        is_root: Whether this schema appears at the API surface
+        incoming_refs: Number of other schemas referencing this one (popularity)
+    """
+    props = schema.get("properties", {})
+    field_count = len(props)
+    required_count = len(schema.get("required", []))
+    ref_count = _count_refs(schema)
+
+    # Priority 1: API root schemas (appears at API surface)
+    if is_root:
+        return "purple"
+
+    # Priority 2: Error and wrapper types
+    if _is_error_or_wrapper(key, schema):
+        return "red"
+
+    # Priority 3: Leaf entities (no outgoing references) - simple data containers
+    if ref_count == 0 and field_count > 0:
+        return "green"
+
+    # Priority 4: Size-based coloring for regular entities
+    # Large complex entities - likely core domain models
+    if field_count >= 8:
+        return "blue"
+
+    # Medium entities
+    if field_count >= 6:
+        return "coral"
+
+    # Small entities - likely DTOs or value objects
+    if field_count >= 3:
+        return "teal"
+
+    # Very small entities - likely enums, configs, or simple types
+    if field_count >= 1:
+        return "amber"
+
+    # Default fallback
     return "gray"
 
 
@@ -320,6 +392,19 @@ def build_html(objects: dict, enums: dict, endpoints: list[dict],
 
     surface_roots = set(schema_usages.keys())
 
+    # Recompute colors with root information and schema popularity
+    # Count incoming references for each schema (how many others reference it)
+    incoming_refs = defaultdict(int)
+    for obj_data in objects.values():
+        for edge in obj_data["edge_data"]:
+            incoming_refs[edge["ref"]] += 1
+
+    # Update colors based on structural analysis
+    for key, obj_data in objects.items():
+        is_root = key in surface_roots
+        schema = raw_schemas.get(key, {})
+        obj_data["color"] = get_color(key, schema, is_root=is_root, incoming_refs=incoming_refs.get(key, 0))
+
     edge_list = []
     seen: set = set()
     for src, data in objects.items():
@@ -389,10 +474,17 @@ def build_html(objects: dict, enums: dict, endpoints: list[dict],
             }
             entities_js.append(entity)
 
+    # Build legend with universal color meanings
     used_colors = sorted({d["color"] for d in objects.values()})
     color_labels = {
-        "purple": "Response root", "blue": "Work / Reference", "teal": "Shares / Claims",
-        "coral": "Parties", "amber": "Scope / Dates", "gray": "Other", "red": "Errors",
+        "purple": "API Root",        # Schemas at API surface
+        "blue": "Complex (8+)",      # Large entities
+        "coral": "Medium (6-7)",     # Medium entities
+        "teal": "Small (3-5)",       # Small entities
+        "amber": "Minimal (1-2)",    # Very small entities
+        "green": "Leaf",             # No relationships
+        "red": "Error/Wrapper",      # Error responses
+        "gray": "Other",             # Uncategorized
     }
     legend_items = "".join(
         f'<div class="ld"><div class="lc" style="background:{html.escape(COLOR_HEX[c])}"></div>'

@@ -6,27 +6,27 @@ Transform your OpenAPI JSON or YAML schemas into beautiful, interactive visualiz
 
 ## Features
 
-### 📊 **Entity Graph**
+### **Entity Graph**
 - Interactive network diagram with pan and zoom capabilities
-- Color-coded entities by type
+- Color-coded entities by type and complexity
 - Visual relationship mapping with cardinality indicators (1, 0..1, 1..*, 0..*)
 - API root schemas highlighted with dashed borders
 - Click any entity to see detailed properties and API endpoint usage
 
-### 🔌 **API Surface**
-- Complete endpoint catalog organized by tags
-- HTTP method color-coding (GET, POST, PUT, PATCH, DELETE)
+### **API Surface**
+- Complete endpoint catalogue organised by tags
+- HTTP method colour-coding (GET, POST, PUT, PATCH, DELETE)
 - Request/response schema mapping
 - Expandable cards showing detailed request bodies and response types
 - Direct navigation to schema details
 open
-### 📋 **All Schemas**
+### **All Schemas**
 - Grid view of all object and enum schemas
 - Quick overview with field counts (required ✦ / optional ○)
 - Compact display with type information
-- Color-coded by category
+- Colour-coded by category
 
-### 🔍 **All Entities**
+### **All Entities**
 - Comprehensive entity browser with real-time filtering
 - Search entities by name (contains string search)
 - Detailed property cards showing:

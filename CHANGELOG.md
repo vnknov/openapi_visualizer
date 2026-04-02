@@ -32,3 +32,34 @@
 - **Core**: Python 3.7+ (no external dependencies for JSON files)
 - **Optional**: PyYAML for YAML file support (`pip install pyyaml`)
 
+
+## [Latest Update]
+
+### Changed - Universal Color Scheme
+- **Redesigned color rules** to be universally applicable to any OpenAPI specification
+- Colors now based on **structural characteristics** rather than domain-specific field names:
+  - **Purple**: API Root entities (appears at API surface)
+  - **Blue**: Large complex entities (8+ fields)
+  - **Coral**: Medium entities (6-7 fields)
+  - **Teal**: Small entities (3-5 fields)
+  - **Amber**: Minimal entities (1-2 fields)
+  - **Green**: Leaf entities (no outgoing relationships)
+  - **Red**: Error/Response wrapper types
+  - **Gray**: Uncategorized/default
+
+### Added - Enhanced Navigation
+- **Automatic node selection** when clicking schema chips in API Surface tab
+  - Clicking a request/response schema now switches to Entity Graph tab
+  - The clicked schema is automatically selected and highlighted in the diagram
+  - Connected paths are highlighted to show relationships
+  - Detail panel opens automatically for the selected schema
+
+### Technical Details
+- Color assignment now considers:
+  - Schema size (field count)
+  - API surface presence (root vs nested)
+  - Relationship count (outgoing references)
+  - Error/wrapper detection patterns
+- Universal patterns work across all API domains (not just specific use cases)
+- Legend updates dynamically based on colors actually used in the spec
+

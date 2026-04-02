@@ -213,6 +213,7 @@ def parse_paths(spec: dict) -> tuple[list[dict], dict]:
                 "responses": [],
             }
 
+            # OpenAPI 3.0+
             rb = op.get("requestBody", {})
             if rb:
                 ref = _schema_ref_from_content(rb.get("content", {}))
@@ -223,8 +224,28 @@ def parse_paths(spec: dict) -> tuple[list[dict], dict]:
                         "context": "request body", "status": None,
                     })
 
+            # Swagger 2.0 parameters (in: body)
+            for param in op.get("parameters", []):
+                if param.get("in") == "body" and "schema" in param:
+                    ref = get_ref(param["schema"])
+                    if not ref and param["schema"].get("type") == "array":
+                        ref = get_ref(param["schema"].get("items", {}))
+                    if ref:
+                        entry["request_schema"] = ref
+                        schema_usages[ref].append({
+                            "method": method.upper(), "path": path,
+                            "context": "request body", "status": None,
+                        })
+
             for status, resp in op.get("responses", {}).items():
+                # OpenAPI 3.0+
                 ref = _schema_ref_from_content(resp.get("content", {}))
+                # Swagger 2.0
+                if not ref and "schema" in resp:
+                    ref = get_ref(resp["schema"])
+                    if not ref and resp["schema"].get("type") == "array":
+                        ref = get_ref(resp["schema"].get("items", {}))
+
                 if ref:
                     entry["responses"].append({"status": status, "schema": ref})
                     schema_usages[ref].append({
@@ -288,6 +309,8 @@ def extract_edges(schema: dict, required_set: set) -> list[dict]:
 
 def parse_schemas(spec: dict) -> tuple[dict, dict]:
     raw = spec.get("components", {}).get("schemas", {})
+    if not raw:
+        raw = spec.get("definitions", {})
     objects, enums = {}, {}
 
     for key, schema in raw.items():
@@ -1619,6 +1642,8 @@ def main():
 
     print(f"  Parsing: {api_title} …")
     raw_schemas = spec.get("components", {}).get("schemas", {})
+    if not raw_schemas:
+        raw_schemas = spec.get("definitions", {})
     objects, enums = parse_schemas(spec)
     endpoints, schema_usages = parse_paths(spec)
     root_count = len([k for k in schema_usages if k in objects])

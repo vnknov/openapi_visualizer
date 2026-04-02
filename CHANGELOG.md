@@ -3,6 +3,16 @@
 ## [Unreleased]
 
 ### Added
+- **Swagger 2.0 (OpenAPI 2.0) Support**: Enhanced compatibility with older API specifications
+  - Support for `definitions` root object for schemas
+  - Extraction of request body schemas from `in: body` parameters
+  - Support for schemas wrapped in arrays in both parameters and responses
+- **Improved API Surface Analysis**: Correctly identifies root-level schemas in Swagger 2.0 files
+
+### Fixed
+- **Empty HTML Reports**: Fixed an issue where no entities were showing in reports generated from Swagger 2.0 specifications
+
+### Added
 - **YAML Support**: Now accepts OpenAPI specifications in YAML format (`.yaml`, `.yml`)
   - Automatic format detection based on file extension
   - Fallback auto-detection for files without standard extensions

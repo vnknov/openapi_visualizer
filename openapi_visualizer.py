@@ -1044,6 +1044,9 @@ Object.entries(byTag).forEach(([tag, eps]) => {{
       chip.appendChild(schemaName);
       chip.addEventListener('click', () => {{
         sw('g', document.querySelector('.tb'));
+        // Select the node in the graph
+        clickedNode = ep.request_schema;
+        updateHighlights();
         showDetail(ep.request_schema);
       }});
       body.appendChild(chip);
@@ -1072,6 +1075,9 @@ Object.entries(byTag).forEach(([tag, eps]) => {{
         chip.appendChild(schemaName);
         chip.addEventListener('click', () => {{
           sw('g', document.querySelector('.tb'));
+          // Select the node in the graph
+          clickedNode = r.schema;
+          updateHighlights();
           showDetail(r.schema);
         }});
         body.appendChild(chip);

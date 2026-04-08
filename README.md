@@ -1,8 +1,8 @@
 #OpenAPI Data Model Visualizer
 
-**An interactive HTML visualization tool for OpenAPI 3.x specifications**
+**An interactive HTML visualization tool for OpenAPI 3.x/2.x specifications**
 
-Transform your OpenAPI JSON or YAML schemas into beautiful, interactive visualizations with four comprehensive views:
+Transform your OpenAPI JSON or YAML schemas into beautiful, interactive visualizations with four comprehensive views: Entity Graph, API Surface, All-Schemas and All-Entities.
 
 ## Features
 
